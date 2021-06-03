@@ -5,8 +5,16 @@ if(WIN32)
 	cmake_policy(SET CMP0091 NEW)
 else()
 	# The Android tools ship with this ancient version, which we need to support.
-	cmake_minimum_required (VERSION 3.10)
+	cmake_minimum_required (VERSION 3.18)
 endif()
+
+include(cmake/HunterGate.cmake)
+
+HunterGate(
+    URL "https://github.com/cpp-pm/hunter/archive/v0.23.302.tar.gz"
+    SHA1 "5712bfde1b45b7ad8f7825a73ccef536eff0ded2"
+    FILEPATH "${CMAKE_CURRENT_LIST_DIR}/cmake/HunterConfig.cmake"
+)
 
 #read sentry-native version
 file(READ "include/sentry.h" _SENTRY_HEADER_CONTENT)
@@ -248,14 +256,25 @@ endif()
 target_compile_definitions(sentry PRIVATE SIZEOF_LONG=${CMAKE_SIZEOF_LONG})
 
 if(SENTRY_TRANSPORT_CURL)
-	find_package(CURL REQUIRED)
+  if(HUNTER_ENABLED)
+    hunter_add_package(CURL)
+  endif()
+  find_package(CURL REQUIRED)
+  if(HUNTER_ENABLED)
+    hunter_add_package(lss)
+    find_package(lss CONFIG REQUIRED)
+  endif()
 	target_include_directories(sentry PRIVATE ${CURL_INCLUDE_DIR})
 	# The exported sentry target must not contain any path of the build machine, therefore use generator expressions
 	# FIXME: cmake 3.12 introduced the target CURL::libcurl
 	string(REPLACE ";" "$<SEMICOLON>" GENEX_CURL_LIBRARIES "${CURL_LIBRARIES}")
 	string(REPLACE ";" "$<SEMICOLON>" GENEX_CURL_COMPILE_DEFINITIONS "${CURL_COMPILE_DEFINITIONS}")
-	target_link_libraries(sentry PRIVATE $<BUILD_INTERFACE:${GENEX_CURL_LIBRARIES}>)
-	target_compile_definitions(sentry PRIVATE $<BUILD_INTERFACE:${GENEX_CURL_COMPILE_DEFINITIONS}>)
+  if(HUNTER_ENABLED)
+    target_link_libraries(sentry PUBLIC CURL::libcurl)
+  else()
+	  target_link_libraries(sentry PUBLIC $<BUILD_INTERFACE:${GENEX_CURL_LIBRARIES}>)
+	  target_compile_definitions(sentry PUBLIC $<BUILD_INTERFACE:${GENEX_CURL_COMPILE_DEFINITIONS}>)
+  endif()
 endif()
 
 set_property(TARGET sentry PROPERTY C_VISIBILITY_PRESET hidden)
@@ -441,14 +460,20 @@ elseif(SENTRY_BACKEND_BREAKPAD)
 		pkg_check_modules(BREAKPAD REQUIRED IMPORTED_TARGET breakpad-client)
 		target_link_libraries(sentry PUBLIC PkgConfig::BREAKPAD)
 	else()
-		add_subdirectory(external)
-		target_include_directories(sentry PRIVATE
-			"$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/external/breakpad/src>"
-		)
-		target_link_libraries(sentry PRIVATE
-			breakpad_client
-		)
-		if(NOT SENTRY_BUILD_SHARED_LIBS)
+    if(HUNTER_ENABLED)
+      hunter_add_package(breakpad)
+      find_package(breakpad CONFIG REQUIRED)
+      target_link_libraries(sentry PRIVATE breakpad::libbreakpad_client)
+    else()
+		  add_subdirectory(external)
+		  target_include_directories(sentry PRIVATE
+			  "$<BUILD_INTERFACE:${PROJECT_SOURCE_DIR}/external/breakpad/src>"
+      )
+		  target_link_libraries(sentry PRIVATE
+			  breakpad_client
+      )
+    endif()
+		if(NOT SENTRY_BUILD_SHARED_LIBS AND NOT HUNTER_ENABLED)
 			sentry_install(TARGETS breakpad_client EXPORT sentry
 				LIBRARY DESTINATION "${CMAKE_INSTALL_LIBDIR}"
 				ARCHIVE DESTINATION "${CMAKE_INSTALL_LIBDIR}"
