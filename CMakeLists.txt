@@ -11,9 +11,8 @@ endif()
 include(cmake/HunterGate.cmake)
 
 HunterGate(
-    URL "https://github.com/cpp-pm/hunter/archive/v0.23.302.tar.gz"
-    SHA1 "5712bfde1b45b7ad8f7825a73ccef536eff0ded2"
-    FILEPATH "${CMAKE_CURRENT_LIST_DIR}/cmake/HunterConfig.cmake"
+    URL "https://github.com/cpp-pm/hunter/archive/v0.23.303.tar.gz"
+    SHA1 "7cf2df886ce3aa39bd5ff82497150dd42e5275dc"
 )
 
 #read sentry-native version
